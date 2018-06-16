@@ -3,7 +3,7 @@
 
 import praw
 import argparse
-import urllib
+import requests
 import os
 from imguralbum import *
 import re
@@ -38,7 +38,7 @@ def download_images(url, args):
 
         if not args.quiet:
             def image_progress(index, image_url, dest):
-                print "Downloading image {} of {} from album {} to {}".format(index, downloader.num_images(), url, dest)
+                print("Downloading image {} of {} from album {} to {}".format(index, downloader.num_images(), url, dest))
 
             downloader.on_image_download(image_progress)
         downloader.save_images(args.output)
@@ -46,7 +46,7 @@ def download_images(url, args):
         # Not an album, unfortunately.
         # or some strange error happened.
         if not e.msg.startswith("URL"):
-            print e.msg
+            print(e.msg)
             return
 
         # Check if it's a silly url.
@@ -57,12 +57,12 @@ def download_images(url, args):
             # we don't know the extension
             # so we have to rip it from the url
             # by reading the HTML, unfortunately.
-            response = urllib.urlopen(url)
-            if response.getcode() != 200:
-                print "Image download failed: HTML response code {}".format(response.getcode())
+            response = requests.get(url)
+            if response.status_code != requests.codes.ok:
+                print("Image download failed: HTML response code {}".format(response.status_code))
                 return
 
-            html = response.read()
+            html = response.text
             image = re.search('<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))"', html)
             if image:
                 image_url = "http:" + image.group(1)
@@ -73,7 +73,7 @@ def download_images(url, args):
 
 
         if not image_url:
-            print "Image url {} could not be properly parsed.".format(url, image)
+            print("Image url {} could not be properly parsed.".format(url, image))
             return
 
         if not os.path.exists(args.output):
@@ -82,10 +82,12 @@ def download_images(url, args):
         p = os.path.join(args.output, image.group(2))
 
         if not args.quiet:
-            print "Downloading image {} to {}".format(image_url, p)
+            print("Downloading image {} to {}".format(image_url, p))
 
-        urllib.urlretrieve(image_url, p)
-
+        imageRequest = requests.get(image_url)
+        imageData = imageRequest.content
+        with open(p, 'wb') as fobj:
+            fobj.write(imageData)
 
 
 
@@ -99,8 +101,8 @@ def redditor_retrieve(r, args):
         download_images(link, args)
 
 def subreddit_retrieve(r, args):
-    sub = r.get_subreddit(args.subreddit)
-    method = getattr(sub, "get_{}".format(args.sort))
+    sub = r.subreddit(args.subreddit)
+    method = getattr(sub, "{}".format(args.sort))
     gen = method(limit=args.limit)
     links = get_urls(gen, args)
     for link in links:
@@ -123,12 +125,34 @@ def post_retrieve(r, args):
     if(is_valid(submission)):
         download_images(submission.url, args)
     else:
-        print "Invalid URL given: {}".format(submission.url)
+        print("Invalid URL given: {}".format(submission.url))
 
 
 if __name__ == "__main__":
     user_agent = "Image retriever 1.0.0 by /u/Rapptz"
     r = praw.Reddit(user_agent=user_agent)
+    
+#  UNCOMMENT this is if you need to login to reddit
+# To use this you will first need to register on Reddit
+# It does not appear to be possible with the new Reddit design
+# So you need to:
+# 1. click on 'Vist old-reddit'
+# 2. Log in    
+# 3. Click on preferences
+# 4. Click on apps
+# 5. Scroll to the bottom and click on create another app
+# 6. Give your app a name (this goes in the user_agent field)
+# 7. Click on the script radio button
+# 8. Add http://localhost:8080 to the redirect uri
+# 9. Copy the "personal use script" code (14 chars), and the secret code (27 chars)
+#    These are your client_id and client_secret respectively
+#
+#  r = praw.Reddit(client_id = 'Personal Use Script here',
+#                    client_secret = 'Secret heree',
+#                    user_agent = 'appName,
+#                    username = 'reddit username',
+#                    password = 'reddit password')
+#    
     parser = argparse.ArgumentParser(description="Downloads imgur images from a user, subreddit, and/or post.",
                                      usage="%(prog)s [options...]")
     parser.add_argument("--username", help="username to scrap and download from", metavar="user")

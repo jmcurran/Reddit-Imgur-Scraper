@@ -12,7 +12,7 @@ Copyright Alex Gisby <alex@solution10.com>
 
 import sys
 import re
-import urllib
+import requests
 import os
 import math
 
@@ -56,13 +56,13 @@ Constructor. Pass in the album_url that you want to download.
 
         # Read the no-script version of the page for all the images:
         noscriptURL = 'http://imgur.com/a/' + self.album_key + '/noscript'
-        self.response = urllib.urlopen(noscriptURL)
+        self.response = requests.get(noscriptURL)
 
-        if self.response.getcode() != 200:
-            raise ImgurAlbumException("Error reading Imgur: Error Code %d" % self.response.getcode())
+        if self.response.status_code != requests.codes.ok:
+            raise ImgurAlbumException("Error reading Imgur: Error Code {}".format(self.response.status_code))
 
         # Read in the images now so we can get stats and stuff:
-        html = self.response.read()
+        html = self.response.text
         self.images = re.findall('<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(jpg|jpeg|png|gif)))"', html)
 
     def num_images(self):
@@ -128,7 +128,7 @@ And if the folder doesn't exist, it'll try and create it.
                 fn(counter, image_url, path)
 
             # Actually download the thing
-            urllib.urlretrieve(image_url, path)
+            requests.get(image_url, path)
 
         # Run the complete callbacks:
         for fn in self.complete_callbacks:
@@ -140,24 +140,24 @@ if __name__ == '__main__':
 
     if len(args) == 1:
         # Print out the help message and exit:
-        print help_message
+        print(help_message)
         exit()
 
     try:
         # Fire up the class:
         downloader = ImgurAlbumDownloader(args[1])
-        print "Found %d images in album" % downloader.num_images()
+        print("Found %d images in album" % downloader.num_images())
 
         # Called when an image is about to download:
         def print_image_progress(index, url, dest):
-            print "Downloading Image %d" % index
-            print " %s >> %s" % (url, dest)
+            print("Downloading Image %d" % index)
+            print(" %s >> %s" % (url, dest))
         downloader.on_image_download(print_image_progress)
 
         # Called when the downloads are all done.
         def all_done():
-            print ""
-            print "Done!"
+            print("")
+            print("Done!")
         downloader.on_complete(all_done)
 
         # Work out if we have a foldername or not:
@@ -171,9 +171,9 @@ if __name__ == '__main__':
         exit()
 
     except ImgurAlbumException as e:
-        print "Error: " + e.msg
-        print ""
-        print "How to use"
-        print "============="
-        print help_message
+        print("Error: " + e.msg)
+        print("")
+        print("How to use")
+        print("=============")
+        print(help_message)
         exit(1)
