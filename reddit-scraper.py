@@ -7,6 +7,7 @@ import requests
 import os
 from imguralbum import *
 import re
+import json
 
 def is_valid(thing):
     # Could make this a single boolean statement
@@ -127,10 +128,15 @@ def post_retrieve(r, args):
     else:
         print("Invalid URL given: {}".format(submission.url))
 
+def read_credentials():
+    with open('credentials.txt', 'r') as f1:
+        creds: object = json.loads(f1.read())
+        return creds
+
 
 if __name__ == "__main__":
-    user_agent = "Image retriever 1.0.0 by /u/Rapptz"
-    r = praw.Reddit(user_agent=user_agent)
+    # user_agent = "Image retriever 1.0.0 by /u/Rapptz"
+    # r = praw.Reddit(user_agent=user_agent)
     
 #  UNCOMMENT this is if you need to login to reddit
 # To use this you will first need to register on Reddit
@@ -147,12 +153,14 @@ if __name__ == "__main__":
 # 9. Copy the "personal use script" code (14 chars), and the secret code (27 chars)
 #    These are your client_id and client_secret respectively
 #
-#  r = praw.Reddit(client_id = 'Personal Use Script here',
-#                    client_secret = 'Secret heree',
-#                    user_agent = 'appName,
-#                    username = 'reddit username',
-#                    password = 'reddit password')
-#    
+    creds = read_credentials()
+
+    r = praw.Reddit(client_id=creds['client_id'],
+                    client_secret=creds['client_secret'],
+                    user_agent=creds['user_agent'],
+                    username=creds['username'],
+                    password=creds['password'])
+
     parser = argparse.ArgumentParser(description="Downloads imgur images from a user, subreddit, and/or post.",
                                      usage="%(prog)s [options...]")
     parser.add_argument("--username", help="username to scrap and download from", metavar="user")
