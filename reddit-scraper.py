@@ -9,6 +9,7 @@ from imguralbum import *
 import re
 import json
 
+
 def is_valid(thing):
     # Could make this a single boolean statement
     # but that's a maintenance nightmare.
@@ -22,12 +23,14 @@ def is_valid(thing):
 
     return False
 
+
 def get_urls(generator, args):
     urls = []
     for thing in generator:
         if is_valid(thing) and thing.url not in urls:
             urls.append(thing.url)
     return urls
+
 
 def download_images(url, args):
     # Check if it's an album
@@ -39,7 +42,8 @@ def download_images(url, args):
 
         if not args.quiet:
             def image_progress(index, image_url, dest):
-                print("Downloading image {} of {} from album {} to {}".format(index, downloader.num_images(), url, dest))
+                print(
+                    "Downloading image {} of {} from album {} to {}".format(index, downloader.num_images(), url, dest))
 
             downloader.on_image_download(image_progress)
         downloader.save_images(args.output)
@@ -68,10 +72,10 @@ def download_images(url, args):
             if image:
                 image_url = "http:" + image.group(1)
         else:
-            image = re.match(r'(https?\:\/\/)?(?:www\.)?(?:m\.)?i\.imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif))', url)
+            image = re.match(r'(https?\:\/\/)?(?:www\.)?(?:m\.)?i\.imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif))',
+                             url)
             if image:
                 image_url = image.group(0)
-
 
         if not image_url:
             print("Image url {} could not be properly parsed.".format(url, image))
@@ -91,8 +95,6 @@ def download_images(url, args):
             fobj.write(imageData)
 
 
-
-
 def redditor_retrieve(r, args):
     user = r.get_redditor(args.username)
     gen = user.get_submitted(sort=args.sort, limit=args.limit)
@@ -101,6 +103,7 @@ def redditor_retrieve(r, args):
     for link in links:
         download_images(link, args)
 
+
 def subreddit_retrieve(r, args):
     sub = r.subreddit(args.subreddit)
     method = getattr(sub, "{}".format(args.sort))
@@ -108,6 +111,7 @@ def subreddit_retrieve(r, args):
     links = get_urls(gen, args)
     for link in links:
         download_images(link, args)
+
 
 def post_retrieve(r, args):
     submission_id = ""
@@ -121,14 +125,24 @@ def post_retrieve(r, args):
         if m:
             submission_id = m.group("id")
 
-    submission = r.get_submission(submission_id = submission_id)
+    submission = r.get_submission(submission_id=submission_id)
 
-    if(is_valid(submission)):
+    if (is_valid(submission)):
         download_images(submission.url, args)
     else:
         print("Invalid URL given: {}".format(submission.url))
 
+
 def read_credentials():
+    ## This function expects to read a json file
+    ## which contains a dictionary with five fields/keys:
+    ## client_id, client_secret, user_agent, username, password
+    ## All entries are strings. The first two keys are 14 and 27
+    ## characters long respectively and come from the reddit API
+    ## when you create a new app (there are some instructions in the main
+    ## section below on how to do this.)
+    ## The user_agent is the name of your reddit app,
+    ## username and password are your reddit username and password
     with open('credentials.txt', 'r') as f1:
         creds: object = json.loads(f1.read())
         return creds
@@ -137,22 +151,22 @@ def read_credentials():
 if __name__ == "__main__":
     # user_agent = "Image retriever 1.0.0 by /u/Rapptz"
     # r = praw.Reddit(user_agent=user_agent)
-    
-#  UNCOMMENT this is if you need to login to reddit
-# To use this you will first need to register on Reddit
-# It does not appear to be possible with the new Reddit design
-# So you need to:
-# 1. click on 'Vist old-reddit'
-# 2. Log in    
-# 3. Click on preferences
-# 4. Click on apps
-# 5. Scroll to the bottom and click on create another app
-# 6. Give your app a name (this goes in the user_agent field)
-# 7. Click on the script radio button
-# 8. Add http://localhost:8080 to the redirect uri
-# 9. Copy the "personal use script" code (14 chars), and the secret code (27 chars)
-#    These are your client_id and client_secret respectively
-#
+
+    #  UNCOMMENT this is if you need to login to reddit
+    # To use this you will first need to register on Reddit
+    # It does not appear to be possible with the new Reddit design
+    # So you need to:
+    # 1. click on 'Vist old-reddit'
+    # 2. Log in
+    # 3. Click on preferences
+    # 4. Click on apps
+    # 5. Scroll to the bottom and click on create another app
+    # 6. Give your app a name (this goes in the user_agent field)
+    # 7. Click on the script radio button
+    # 8. Add http://localhost:8080 to the redirect uri
+    # 9. Copy the "personal use script" code (14 chars), and the secret code (27 chars)
+    #    These are your client_id and client_secret respectively
+    #
     creds = read_credentials()
 
     r = praw.Reddit(client_id=creds['client_id'],
@@ -167,21 +181,21 @@ if __name__ == "__main__":
     parser.add_argument("--subreddit", help="subreddit to scrap and download from", metavar="sub")
     parser.add_argument("--post", help="post to scrap and download from", metavar="url")
 
-    parser.add_argument("--sort", help="choose the sort order for submissions (default: new)", 
-                                  choices=["hot", "new", "controversial", "top"], metavar="type", default="new")
+    parser.add_argument("--sort", help="choose the sort order for submissions (default: new)",
+                        choices=["hot", "new", "controversial", "top"], metavar="type", default="new")
 
     parser.add_argument("--limit", type=int, help="number of submissions to look for (default: 100)",
-                                   default=100, metavar="num")
+                        default=100, metavar="num")
 
     parser.add_argument("-q", "--quiet", action="store_true", help="doesn't print image download progress")
     parser.add_argument("-o", "--output", help="where to output the downloaded images", metavar="", default=".")
     parser.add_argument("--no-nsfw", action="store_true", help="only downloads images not marked nsfw")
 
-    parser.add_argument("--score", help="minimum score of the image to download (default: 1)", type=int, 
-                                   metavar="num", default=1)
+    parser.add_argument("--score", help="minimum score of the image to download (default: 1)", type=int,
+                        metavar="num", default=1)
 
     parser.add_argument("-l", "--length", help="skips album downloads over this length (default: 30)", type=int,
-                                          default=30, metavar="num")
+                        default=30, metavar="num")
 
     args = parser.parse_args()
 
