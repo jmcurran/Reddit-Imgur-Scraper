@@ -5,7 +5,7 @@ import praw
 import argparse
 import requests
 import os
-from imguralbum import *
+import imguralbum as ia
 import re
 import json
 
@@ -35,7 +35,7 @@ def get_urls(generator, args):
 def download_images(url, args):
     # Check if it's an album
     try:
-        downloader = ImgurAlbumDownloader(url)
+        downloader = ia.ImgurAlbumDownloader(url)
 
         if downloader.num_images() > args.length:
             return
@@ -47,7 +47,7 @@ def download_images(url, args):
 
             downloader.on_image_download(image_progress)
         downloader.save_images(args.output)
-    except ImgurAlbumException as e:
+    except ia.ImgurAlbumException as e:
         # Not an album, unfortunately.
         # or some strange error happened.
         if not e.msg.startswith("URL"):
@@ -68,12 +68,13 @@ def download_images(url, args):
                 return
 
             html = response.text
-            image = re.search('<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))"', html)
+            imageURLRegex = '<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + ')))"'
+            image = re.search(imageURLRegex, html)
             if image:
                 image_url = "http:" + image.group(1)
         else:
-            image = re.match(r'(https?\:\/\/)?(?:www\.)?(?:m\.)?i\.imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif))',
-                             url)
+            imageURLRegex = '(https?\:\/\/)?(?:www\.)?(?:m\.)?i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + '))'
+            image = re.match(imageURLRegex, url)
             if image:
                 image_url = image.group(0)
 
@@ -96,8 +97,9 @@ def download_images(url, args):
 
 
 def redditor_retrieve(r, args):
-    user = r.get_redditor(args.username)
-    gen = user.get_submitted(sort=args.sort, limit=args.limit)
+    user = r.redditor(args.username)
+    method = getattr(user, "sumissions().{}".format(args.sort))
+    gen = method(limit=args.limit)
 
     links = get_urls(gen, args)
     for link in links:
@@ -186,6 +188,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--limit", type=int, help="number of submissions to look for (default: 100)",
                         default=100, metavar="num")
+    
+    parser.add_argument("--extn", help="a | delimited list of file extensions, e.g. jpg|gif", metavar="extn",
+                        default = "jpg|jpeg|png|gif")
 
     parser.add_argument("-q", "--quiet", action="store_true", help="doesn't print image download progress")
     parser.add_argument("-o", "--output", help="where to output the downloaded images", metavar="", default=".")
