@@ -55,7 +55,8 @@ def download_images(url, args):
             return
 
         # Check if it's a silly url.
-        m = re.match(r"(?:https?\:\/\/)?(?:www\.)?(?:m\.)?imgur\.com\/([a-zA-Z0-9]+)", url)
+        pat = re.compile(r"(?:https?\:\/\/)?(?:www\.)?(?:m\.)?imgur\.com\/([a-zA-Z0-9]+)")
+        m = pat.match(url)
         image = ''
         image_url = ''
         if m:
@@ -68,10 +69,16 @@ def download_images(url, args):
                 return
 
             html = response.text
-            imageURLRegex = '<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + ')))"'
-            image = re.search(imageURLRegex, html)
+            imageURLRegex = re.compile('<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + ')))"')
+            image = imageURLRegex.search(html)
             if image:
                 image_url = "http:" + image.group(1)
+            else:
+                imageURLRegex = re.compile('<link rel="image_src" +href="(?:https?\:)?(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + ')))"')
+                image = imageURLRegex.search(html)
+                if image:
+                    image_url = "http:" + image.group(1)
+            
         else:
             imageURLRegex = '(https?\:\/\/)?(?:www\.)?(?:m\.)?i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + '))'
             image = re.match(imageURLRegex, url)
