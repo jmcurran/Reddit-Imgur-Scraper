@@ -40,7 +40,7 @@ def parseImgurURL(url, args):
     # Firstly check to see if we need to read the HTML, or if we can 
     # read the file directly
     
-    pattern = re.compile(r"^(?:https?\:\/\/)?(?:www\.)?(?:[mi]\.)?imgur\.com\/([a-zA-Z0-9]+)$")
+    pattern = re.compile(r"^(?:https?\:\/\/)?(?:www\.)?(?:[mi]\.)?imgur\.com\/([a-zA-Z0-9,]+)$")
     m = pattern.match(url)
     if m:
         # we don't know the extension
@@ -52,24 +52,32 @@ def parseImgurURL(url, args):
             return image, image_url
 
         html = response.text
-        imageURLRegex = re.compile('<img src="(\/\/(:?[mi]\.)?imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))"')
+        imageURLRegex = re.compile('<img src="(?P<url>(?:https?\:\/\/)?(:?[mi]\.)?imgur\.com\/(?P<image>[a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))"')
         image = imageURLRegex.search(html)
         if image:
-            image_url = "http:" + image.group(1)
-            image = image.group(3)
+            image_url = "http:" + image.group("url")
+            image = image.group("image")
         else:
-            imageURLRegex = re.compile('<link rel="image_src" +href="(?:https?\:)?(\/\/(:?[mi]\.)?imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))[^"]*"')
+            imageURLRegex = re.compile('<link rel="image_src"\s+href="(?:https?\:)?(?P<url>\/\/(:?[mi]\.)?imgur\.com\/(?P<image>[a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))[^"]*"')
             image = imageURLRegex.search(html)
             if image:
-               image_url = "http:" + image.group(1)
-               image = image.group(3)
+               image_url = "http:" + image.group("url")
+               image = image.group("image")
     else:
-        imageURLRegex = re.compile('(https?\:\/\/)?(?:www\.)?(?:[mi]\.)?imgur\.com\/([a-zA-Z0-9]+\.(:?jpg|jpeg|png|gif))')
+        imageURLRegex = re.compile('(https?\:\/\/)?(?:www\.)?(?:[mi]\.)?imgur\.com\/(?P<image>[^.]+\.(:?jpg|jpeg|png|gif))')
         image = imageURLRegex.match(url)
         if image:
             image_url = image.group(0)
-            image = image.group(2)
-
+            image = image.group("image")
+            
+            p = re.compile('_d\.(jpg|jpeg|png|gif)')
+            md = p.search(image)
+            
+            if md:
+                p = re.compile('(?P<prefix>^.*)_d\.(?P<suffix>jpg|jpeg|png|gif).*$')
+                image_url = p.sub('\g<prefix>\g<suffix>', image_url)
+                image = p.sub('\g<prefix>\g<suffix>', image)
+ 
     return image_url, image
     
 def isCorrectExtension(image, args):
@@ -118,6 +126,8 @@ def download_images(url, args):
         
         if not image_url:
             print("Image url {} could not be properly parsed.".format(url, image))
+            with open('notparsed.txt', 'a') as f1:
+                f1.write("{}\n".format(url))
             return
         
         if not os.path.exists(args.output):
@@ -160,23 +170,27 @@ def redditor_retrieve(r, args):
 
 
 def subreddit_retrieve(r, args):
-    sub = r.subreddit(args.subreddit)
-    method = getattr(sub, "{}".format(args.sort))
-    gen = method(limit=args.limit)
-    links = get_urls(gen, args)
-    for link in links:
-        download_images(link, args)
+    subreddits = args.subreddit.split(',')
+    for sub in subreddits:
+        sub = r.subreddit(sub)
+        method = getattr(sub, "{}".format(args.sort))
+        gen = method(limit=args.limit)
+        links = get_urls(gen, args)
+        for link in links:
+            download_images(link, args)
 
 
 def post_retrieve(r, args):
     submission_id = ""
 
-    m = re.match(r"(?:https?\:\/\/)?(?:www\.)?reddit.com\/r\/(?P<sub>\w+)\/comments\/(?P<id>\w+).+", args.post)
+    p = re.compile(r"(?:https?\:\/\/)?(?:www\.)?reddit.com\/r\/(?P<sub>\w+)\/comments\/(?P<id>\w+).+")
+    m = regex.match(args.post)
 
     if m:
         submission_id = m.group("id")
     else:
-        m = re.match(r"(?:https?\:\/\/)?redd\.it\/(?P<id>\w+)", args.post)
+        p = re.compile(r"(?:https?\:\/\/)?redd\.it\/(?P<id>\w+)")
+        m = p.match(args.post)
         if m:
             submission_id = m.group("id")
 
@@ -233,7 +247,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Downloads imgur images from a user, subreddit, and/or post.",
                                      usage="%(prog)s [options...]")
     parser.add_argument("--username", help="username to scrap and download from", metavar="user")
-    parser.add_argument("--subreddit", help="subreddit to scrap and download from", metavar="sub")
+    parser.add_argument("--subreddit", help="subreddit(s) to scrap and download from", metavar="sub")
     parser.add_argument("--post", help="post to scrap and download from", metavar="url")
 
     parser.add_argument("--sort", help="choose the sort order for submissions (default: new)",
