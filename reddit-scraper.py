@@ -8,6 +8,8 @@ import os
 import imguralbum as ia
 import re
 import json
+from PIL import Image
+from io import BytesIO
 
 
 def is_valid(thing):
@@ -30,6 +32,64 @@ def get_urls(generator, args):
         if is_valid(thing) and thing.url not in urls:
             urls.append(thing.url)
     return urls
+
+def parseImgurURL(url, args):
+    image = ''
+    image_url = ''
+
+    # Firstly check to see if we need to read the HTML, or if we can 
+    # read the file directly
+    
+    pattern = re.compile(r"^(?:https?\:\/\/)?(?:www\.)?(?:[mi]\.)?imgur\.com\/([a-zA-Z0-9]+)$")
+    m = pattern.match(url)
+    if m:
+        # we don't know the extension
+        # so we have to rip it from the url
+        # by reading the HTML, unfortunately.
+        response = requests.get(url)
+        if response.status_code != requests.codes.ok:
+            print("Image download failed: HTML response code {}".format(response.status_code))
+            return image, image_url
+
+        html = response.text
+        imageURLRegex = re.compile('<img src="(\/\/(:?[mi]\.)?imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))"')
+        image = imageURLRegex.search(html)
+        if image:
+            image_url = "http:" + image.group(1)
+            image = image.group(3)
+        else:
+            imageURLRegex = re.compile('<link rel="image_src" +href="(?:https?\:)?(\/\/(:?[mi]\.)?imgur\.com\/([a-zA-Z0-9]+\.(?:jpg|jpeg|png|gif)))[^"]*"')
+            image = imageURLRegex.search(html)
+            if image:
+               image_url = "http:" + image.group(1)
+               image = image.group(3)
+    else:
+        imageURLRegex = re.compile('(https?\:\/\/)?(?:www\.)?(?:[mi]\.)?imgur\.com\/([a-zA-Z0-9]+\.(:?jpg|jpeg|png|gif))')
+        image = imageURLRegex.match(url)
+        if image:
+            image_url = image.group(0)
+            image = image.group(2)
+
+    return image_url, image
+    
+def isCorrectExtension(image, args):
+    regex = re.compile(r"^[a-zA-Z0-9]+\.(.*)$")
+    fileExtn = regex.match(image)
+    
+    if fileExtn:
+        fileExtn = fileExtn.group(1)
+        fileExtnRegex = re.compile('^' + args.extn + '$')
+        m = fileExtnRegex.match(fileExtn)
+        if not m:
+            print("Image {} is has extension {} which does not match the pattern {}. Change the --extn argument if this is not correct".format(image, fileExtn, args.extn))
+            return False
+        else:
+            return True
+    else:
+        print("Image {} does not match the pattern {}. Change the --extn argument if this is not correct".format(image, args.extn))
+        return False
+
+
 
 
 def download_images(url, args):
@@ -54,53 +114,39 @@ def download_images(url, args):
             print(e.msg)
             return
 
-        # Check if it's a silly url.
-        pat = re.compile(r"(?:https?\:\/\/)?(?:www\.)?(?:m\.)?imgur\.com\/([a-zA-Z0-9]+)")
-        m = pat.match(url)
-        image = ''
-        image_url = ''
-        if m:
-            # we don't know the extension
-            # so we have to rip it from the url
-            # by reading the HTML, unfortunately.
-            response = requests.get(url)
-            if response.status_code != requests.codes.ok:
-                print("Image download failed: HTML response code {}".format(response.status_code))
-                return
-
-            html = response.text
-            imageURLRegex = re.compile('<img src="(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + ')))"')
-            image = imageURLRegex.search(html)
-            if image:
-                image_url = "http:" + image.group(1)
-            else:
-                imageURLRegex = re.compile('<link rel="image_src" +href="(?:https?\:)?(\/\/i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + ')))"')
-                image = imageURLRegex.search(html)
-                if image:
-                    image_url = "http:" + image.group(1)
-            
-        else:
-            imageURLRegex = '(https?\:\/\/)?(?:www\.)?(?:m\.)?i\.imgur\.com\/([a-zA-Z0-9]+\.(?:' + args.extn + '))'
-            image = re.match(imageURLRegex, url)
-            if image:
-                image_url = image.group(0)
-
+        image_url, image = parseImgurURL(url, args)
+        
         if not image_url:
             print("Image url {} could not be properly parsed.".format(url, image))
             return
-
+        
         if not os.path.exists(args.output):
             os.makedirs(args.output)
-
-        p = os.path.join(args.output, image.group(2))
-
+            
+        if not isCorrectExtension(image, args):
+            return
+            
+        p = os.path.join(args.output, image)
+       
+        if(os.path.isfile(p)):
+           print("File {} exists, skipping.".format(p))
+           return
+           
+       
         if not args.quiet:
             print("Downloading image {} to {}".format(image_url, p))
 
         imageRequest = requests.get(image_url)
         imageData = imageRequest.content
-        with open(p, 'wb') as fobj:
-            fobj.write(imageData)
+       
+        im = Image.open(BytesIO(imageData))
+        w, h = im.size
+        im.close()
+        if w == 161 and h ==81:
+            print("Skipping {} as file is a \"Image deleted\"".format(p))
+        else:
+            with open(p, 'wb') as fobj:
+                fobj.write(imageData)
 
 
 def redditor_retrieve(r, args):
