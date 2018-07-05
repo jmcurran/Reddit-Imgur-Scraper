@@ -1,3 +1,4 @@
 *.pyc
 credentials.txt
-*.zip 
+*.zip
+notparsed.txt
