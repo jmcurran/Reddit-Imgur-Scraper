@@ -47,5 +47,5 @@ def parseImgurURL(url):
 
     return image_url, image
 
-image_url, image = parseImgurURL('https://i.imgur.com/5aWKnRK_d.jpg?maxwidth=640&shape=thumb&fidelity=medium')
+image_url, image = parseImgurURL('')
 print("url: {}\nImage:{}".format(image_url, image))
