@@ -2,4 +2,4 @@ subreddit_list_file=s2.txt
 limit=1000
 sort=new
 extn=jpe?g
-output=~/temp/
+output=/Users/jcur002/temp/

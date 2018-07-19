@@ -102,6 +102,12 @@ def isCorrectExtension(image, args):
 
 def download_images(url, args):
     # Check if it's an album
+    # NOTE: This no longer work as this isn't how Imgur handles albums
+    #       Ideally it should be handled through the Imgur API, but the 
+    #       Python library for this is now unsupported as Imgur wants 
+    #       users to use OAuth2 and their API.
+    #       There is a hack around this which will work, but I haven't 
+    #       implemented it yet
     try:
         downloader = ia.ImgurAlbumDownloader(url)
 
@@ -125,7 +131,7 @@ def download_images(url, args):
         image_url, image = parseImgurURL(url, args)
         
         if not image_url:
-            print("Image url {} could not be properly parsed.".format(url, image))
+            #print("Image url {} could not be properly parsed.".format(url, image))
             with open('notparsed.txt', 'a') as f1:
                 f1.write("{}\n".format(url))
             return
@@ -139,18 +145,18 @@ def download_images(url, args):
         p = os.path.join(args.output, image)
         
         if(os.path.isfile(p)):
-           print("File {} exists, skipping.".format(p))
+           #print("File {} exists, skipping.".format(p))
            return
         
         if(args.output2):
             p2 = os.path.join(args.output2, image)
             if(os.path.isfile(p2)):
-                print("File {} exists, skipping.".format(p2))
+                #print("File {} exists, skipping.".format(p2))
                 return
                
        
-        if not args.quiet:
-            print("Downloading image {} to {}".format(image_url, p))
+       # if not args.quiet:
+       #     print("Downloading image {} to {}".format(image_url, p))
 
         imageRequest = requests.get(image_url)
         imageData = imageRequest.content
@@ -158,11 +164,33 @@ def download_images(url, args):
         im = Image.open(BytesIO(imageData))
         w, h = im.size
         im.close()
-        if w == 161 and h ==81:
-            print("Skipping {} as file is a \"Image deleted\"".format(p))
-        else:
+        if not (w == 161 and h == 81): # this is the imgur image not found jpg
             with open(p, 'wb') as fobj:
                 fobj.write(imageData)
+
+# Print iterations progress
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█'):
+    """
+    Credit goes to:
+        User Greenstick (https://stackoverflow.com/users/2206251/greenstick) for this answer
+        https://stackoverflow.com/a/34325723/3746992
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
+    # Print New Line on Complete
+    if iteration == total: 
+        print()
 
 
 def redditor_retrieve(r, args):
@@ -187,7 +215,11 @@ def subreddit_retrieve(r, args):
         method = getattr(sub, "{}".format(args.sort))
         gen = method(limit=args.limit)
         links = get_urls(gen, args)
-        for link in links:
+        numLinks = len(links)
+        printProgressBar(0, numLinks, prefix = 'Progress:', suffix = 'Complete', length = 50)
+
+        for l, link in enumerate(links):
+            printProgressBar(l + 1, numLinks, prefix = 'Progress:', suffix = 'Complete', length = 50)
             download_images(link, args)
 
 
@@ -195,7 +227,7 @@ def post_retrieve(r, args):
     submission_id = ""
 
     p = re.compile(r"(?:https?\:\/\/)?(?:www\.)?reddit.com\/r\/(?P<sub>\w+)\/comments\/(?P<id>\w+).+")
-    m = regex.match(args.post)
+    m = p.match(args.post)
 
     if m:
         submission_id = m.group("id")
@@ -246,6 +278,8 @@ def read_config_file(args):
     content = [line.rstrip('\n') for line in content]
     content = ['--' + line for line in content]     
     return content
+
+
 
 if __name__ == "__main__":
     # user_agent = "Image retriever 1.0.0 by /u/Rapptz"
