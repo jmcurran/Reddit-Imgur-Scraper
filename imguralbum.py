@@ -49,7 +49,7 @@ Constructor. Pass in the album_url that you want to download.
         # Check the URL is actually imgur:
         match = re.match('(https?)\:\/\/(www\.)?(?:m\.)?imgur\.com/a/([a-zA-Z0-9]+)(#[0-9]+)?', album_url)
         if not match:
-            raise ImgurAlbumException("URL must be a valid Imgur Album")
+            raise ImgurAlbumException("URL {} does not contain a valid Imgur Album".format(album_url))
 
         self.protocol = match.group(1)
         self.album_key = match.group(3)

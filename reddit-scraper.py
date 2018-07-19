@@ -137,11 +137,17 @@ def download_images(url, args):
             return
             
         p = os.path.join(args.output, image)
-       
+        
         if(os.path.isfile(p)):
            print("File {} exists, skipping.".format(p))
            return
-           
+        
+        if(args.output2):
+            p2 = os.path.join(args.output2, image)
+            if(os.path.isfile(p2)):
+                print("File {} exists, skipping.".format(p2))
+                return
+               
        
         if not args.quiet:
             print("Downloading image {} to {}".format(image_url, p))
@@ -170,8 +176,13 @@ def redditor_retrieve(r, args):
 
 
 def subreddit_retrieve(r, args):
+    print(args.subreddit)
     subreddits = args.subreddit.split(',')
     for sub in subreddits:
+        print("=======================\n")
+        print("Subreddit: {}\n".format(sub))
+        print("=======================\n")
+        
         sub = r.subreddit(sub)
         method = getattr(sub, "{}".format(args.sort))
         gen = method(limit=args.limit)
@@ -216,6 +227,25 @@ def read_credentials():
         creds: object = json.loads(f1.read())
         return creds
 
+def read_subreddit_list_file(args):
+    fname = args.subreddit_list_file
+    
+    with open(fname) as f:
+        content = f.readlines()
+        
+    content = [line.rstrip('\n') for line in content]
+        
+    return ",".join(content)
+
+def read_config_file(args):
+    fname = args.config
+    
+    with open(fname) as f:
+        content = f.readlines()
+        
+    content = [line.rstrip('\n') for line in content]
+    content = ['--' + line for line in content]     
+    return content
 
 if __name__ == "__main__":
     # user_agent = "Image retriever 1.0.0 by /u/Rapptz"
@@ -246,8 +276,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Downloads imgur images from a user, subreddit, and/or post.",
                                      usage="%(prog)s [options...]")
+    parser.add_argument("--config", help="Configuration file which contains any valid command line arguments.",
+                        metavar="cfg_file")
     parser.add_argument("--username", help="username to scrap and download from", metavar="user")
     parser.add_argument("--subreddit", help="subreddit(s) to scrap and download from", metavar="sub")
+    parser.add_argument("--subreddit_list_file", help="A text file containing subreddit(s) to scrap and download from", 
+                        metavar="sub_list_file")
     parser.add_argument("--post", help="post to scrap and download from", metavar="url")
 
     parser.add_argument("--sort", help="choose the sort order for submissions (default: new)",
@@ -261,6 +295,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-q", "--quiet", action="store_true", help="doesn't print image download progress")
     parser.add_argument("-o", "--output", help="where to output the downloaded images", metavar="", default=".")
+    parser.add_argument("-o2", "--output2", help="A second location to check file hasn't already been download", metavar="")
     parser.add_argument("--no-nsfw", action="store_true", help="only downloads images not marked nsfw")
 
     parser.add_argument("--score", help="minimum score of the image to download (default: 1)", type=int,
@@ -270,12 +305,23 @@ if __name__ == "__main__":
                         default=30, metavar="num")
 
     args = parser.parse_args()
+    
+    if args.config:
+        newArgs = read_config_file(args)
+        args = parser.parse_args(newArgs)
+    
 
     if args.username:
         redditor_retrieve(r, args)
 
     if args.subreddit:
         subreddit_retrieve(r, args)
+        
+    if args.subreddit_list_file:
+        args.subreddit = read_subreddit_list_file(args)
+        subreddit_retrieve(r, args)
 
     if args.post:
         post_retrieve(r, args)
+        
+        
