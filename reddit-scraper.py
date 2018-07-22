@@ -7,8 +7,8 @@ import requests
 import os
 import re
 import json
-from ImgurAlbum import ImgurAlbumDownloader
-from ImgurAlbum import ImgurAlbumException
+from ImgurAlbumDownloader import ImgurAlbumDownloader
+from ImgurAlbumDownloader import ImgurAlbumException
 from PIL import Image
 from io import BytesIO
 
@@ -121,7 +121,7 @@ def download_images(url, args):
                     "Downloading image {} of {} from album {} to {}".format(index, downloader.num_images(), url, dest))
 
             downloader.on_image_download(image_progress)
-        downloader.save_images(args.output)
+        downloader.save_images(args.output, True)
     except ImgurAlbumException as e:
         # Not an album, unfortunately.
         # or some strange error happened.
@@ -326,7 +326,7 @@ if __name__ == "__main__":
                         default=100, metavar="num")
     
     parser.add_argument("--extn", help="a | delimited list of file extensions, e.g. jpg|gif", metavar="extn",
-                        default = "jpg|jpeg|png|gif")
+                        default = "jpe?g|png|gif")
 
     parser.add_argument("-q", "--quiet", action="store_true", help="doesn't print image download progress")
     parser.add_argument("-o", "--output", help="where to output the downloaded images", metavar="", default=".")

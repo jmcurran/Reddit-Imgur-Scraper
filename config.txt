@@ -1,5 +1,6 @@
-subreddit_list_file=s2.txt
+subreddit_list_file=subreddits.txt
 limit=1000
 sort=new
 extn=jpe?g
-output=/Users/jcur002/temp/
+output=d:/temp/new
+output2=d:/temp/new2
