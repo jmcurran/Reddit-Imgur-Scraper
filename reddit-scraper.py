@@ -5,9 +5,10 @@ import praw
 import argparse
 import requests
 import os
-import imguralbum as ia
 import re
 import json
+from ImgurAlbum import ImgurAlbumDownloader
+from ImgurAlbum import ImgurAlbumException
 from PIL import Image
 from io import BytesIO
 
@@ -109,7 +110,7 @@ def download_images(url, args):
     #       There is a hack around this which will work, but I haven't 
     #       implemented it yet
     try:
-        downloader = ia.ImgurAlbumDownloader(url)
+        downloader = ImgurAlbumDownloader(url)
 
         if downloader.num_images() > args.length:
             return
@@ -121,7 +122,7 @@ def download_images(url, args):
 
             downloader.on_image_download(image_progress)
         downloader.save_images(args.output)
-    except ia.ImgurAlbumException as e:
+    except ImgurAlbumException as e:
         # Not an album, unfortunately.
         # or some strange error happened.
         if not e.msg.startswith("URL"):
