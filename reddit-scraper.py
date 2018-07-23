@@ -110,7 +110,7 @@ def download_images(url, args):
     #       There is a hack around this which will work, but I haven't 
     #       implemented it yet
     try:
-        downloader = ImgurAlbumDownloader(url)
+        downloader = ImgurAlbumDownloader(url, extn = args.extn)
 
         if downloader.num_images() > args.length:
             return
