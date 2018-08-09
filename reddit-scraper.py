@@ -11,6 +11,7 @@ from ImgurAlbumDownloader import ImgurAlbumDownloader
 from ImgurAlbumDownloader import ImgurAlbumException
 from PIL import Image
 from io import BytesIO
+from progressbar import ProgressBar
 
 
 def is_valid(thing):
@@ -98,17 +99,60 @@ def isCorrectExtension(image, args):
         print("Image {} does not match the pattern {}. Change the --extn argument if this is not correct".format(image, args.extn))
         return False
 
+def isImgurAlbum(url):
+    p = re.compile("(https?)\:\/\/(www\.)?(?:m\.)?imgur\.com/(a|gallery)/([a-zA-Z0-9]+)(#[0-9]+)?")
+    m = p.match(url)
+    if m:
+        return True
+    else:
+        return False
 
+def decorate_album_urls(bareURLs, albumKey):
+    decoratedURLs = []
+    for i, u in enumerate(bareURLs):
+        decorated = (u, "{}_{:0>2}".format(albumKey, i+1))
+        decoratedURLs.append(decorated)
+    
+    return decoratedURLs
+ 
+def process_album_urls(albumURLs, args):
+    imageURLs = []
+    
+    for url in albumURLs:
+        try:
+            downloader = ImgurAlbumDownloader(url, args.extn)
+            
+            if downloader.num_images() < args.length:
+                du = decorate_album_urls(downloader.imageURLs, downloader.album_key)
+                imageURLs = imageURLs + du
+                
+        except ImgurAlbumException as e:
+                # Not an album, unfortunately.
+                # or some strange error happened.
+            if not e.msg.startswith("URL"):
+                print(e.msg)
+            else:
+                ## Assume it's okay, but just not an album
+                imageURLs.append(url)
+                
+    return imageURLs
 
 
 def download_images(url, args):
+    if isinstance(url, tuple):
+        isAlbumImage = True
+        albumImageName = url[1]
+        url = url[0]
+    else:
+        isAlbumImage = False
+        
     # Check if it's an album
-    # NOTE: This no longer work as this isn't how Imgur handles albums
-    #       Ideally it should be handled through the Imgur API, but the 
-    #       Python library for this is now unsupported as Imgur wants 
-    #       users to use OAuth2 and their API.
-    #       There is a hack around this which will work, but I haven't 
-    #       implemented it yet
+    # NOTE: This should probably be removed now that albums are handled differently
+    # NOTE: This works but ideally it should be handled through the 
+    #       Imgur API, but the  Python library for this is now unsupported 
+    #       as Imgur wants users to use OAuth2 and their API.
+    #       I don't want to add this at this point in time, but it may become
+    #       inevitable
     try:
         downloader = ImgurAlbumDownloader(url, extn = args.extn)
 
@@ -142,6 +186,10 @@ def download_images(url, args):
             
         if not isCorrectExtension(image, args):
             return
+        
+        if isAlbumImage:
+            imageExtn = os.path.splitext(image)[1]
+            image = albumImageName + imageExtn
             
         p = os.path.join(args.output, image)
         
@@ -169,30 +217,6 @@ def download_images(url, args):
             with open(p, 'wb') as fobj:
                 fobj.write(imageData)
 
-# Print iterations progress
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█'):
-    """
-    Credit goes to:
-        User Greenstick (https://stackoverflow.com/users/2206251/greenstick) for this answer
-        https://stackoverflow.com/a/34325723/3746992
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '\r')
-    # Print New Line on Complete
-    if iteration == total: 
-        print()
-
 
 def redditor_retrieve(r, args):
     user = r.redditor(args.username)
@@ -215,12 +239,23 @@ def subreddit_retrieve(r, args):
         sub = r.subreddit(sub)
         method = getattr(sub, "{}".format(args.sort))
         gen = method(limit=args.limit)
+        
         links = get_urls(gen, args)
+        albumLinks = [l for l in links if isImgurAlbum(l)]
+        imageLinks = [l for l in links if not isImgurAlbum(l)]
+        
+        albumLinks = process_album_urls(albumLinks, args)
+        
+        print("{} {}".format(len(albumLinks), len(imageLinks)))
+        
+        links = imageLinks + albumLinks
+        
         numLinks = len(links)
-        printProgressBar(0, numLinks, prefix = 'Progress:', suffix = 'Complete', length = 50)
+        print(numLinks)
+        pb = ProgressBar(0, numLinks, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
         for l, link in enumerate(links):
-            printProgressBar(l + 1, numLinks, prefix = 'Progress:', suffix = 'Complete', length = 50)
+            pb.setProgressBar(l + 1)
             download_images(link, args)
 
 
@@ -267,6 +302,7 @@ def read_subreddit_list_file(args):
         content = f.readlines()
         
     content = [line.rstrip('\n') for line in content]
+    content = [line for line in content if not re.match("^#.*$", line)]
         
     return ",".join(content)
 

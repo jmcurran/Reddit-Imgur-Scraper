@@ -2,5 +2,5 @@ subreddit_list_file=subreddits.txt
 limit=1000
 sort=new
 extn=jpe?g
-output=d:/temp/new
-output2=d:/temp/new2
+output=d:/temp/new/new
+output2=d:/temp/new/filed
